@@ -2,8 +2,35 @@ import chromadb
 from chromadb.config import Settings
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+import requests
 from models import Course, CourseChunk
-from sentence_transformers import SentenceTransformer
+
+
+def create_ollama_embedding_function(model: str, url: str):
+    """Create an Ollama embedding function for ChromaDB"""
+
+    class OllamaEmbeddingFunction:
+        def __init__(self, model: str, url: str):
+            self.model = model
+            self.url = url
+
+        def __call__(self, input: List[str]) -> List[List[float]]:
+            embeddings = []
+            for text in input:
+                response = requests.post(
+                    f"{self.url}/api/embeddings",
+                    json={"model": self.model, "prompt": text}
+                )
+                if response.status_code == 200:
+                    embeddings.append(response.json()["embedding"])
+                else:
+                    raise Exception(f"Ollama embedding failed: {response.status_code} {response.text}")
+            return embeddings
+
+        def name(self) -> str:
+            return "ollama-embedding"
+
+    return OllamaEmbeddingFunction(model, url)
 
 @dataclass
 class SearchResults:
@@ -34,18 +61,14 @@ class SearchResults:
 class VectorStore:
     """Vector storage using ChromaDB for course content and metadata"""
     
-    def __init__(self, chroma_path: str, embedding_model: str, max_results: int = 5):
+    def __init__(self, chroma_path: str, embedding_model: str, max_results: int = 5, ollama_url: str = "http://localhost:11434"):
         self.max_results = max_results
-        # Initialize ChromaDB client
         self.client = chromadb.PersistentClient(
             path=chroma_path,
             settings=Settings(anonymized_telemetry=False)
         )
-        
-        # Set up sentence transformer embedding function
-        self.embedding_function = chromadb.utils.embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=embedding_model
-        )
+
+        self.embedding_function = create_ollama_embedding_function(embedding_model, ollama_url)
         
         # Create collections for different types of data
         self.course_catalog = self._create_collection("course_catalog")  # Course titles/instructors
