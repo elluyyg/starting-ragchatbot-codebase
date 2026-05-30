@@ -105,6 +105,8 @@ header h1 {
 
 .sidebar-section {
     margin-bottom: 1.5rem;
+    background: transparent;
+    border: none;
 }
 
 .sidebar-section:last-child {
