@@ -22,7 +22,7 @@ class CourseSearchTool(Tool):
     
     def __init__(self, vector_store: VectorStore):
         self.store = vector_store
-        self.last_sources = []  # Track sources from last search
+        self.last_sources = []  # Track sources from last search (list of dicts with title/link)
     
     def get_tool_definition(self) -> Dict[str, Any]:
         """Return Anthropic tool definition for this tool"""
@@ -87,30 +87,69 @@ class CourseSearchTool(Tool):
     
     def _format_results(self, results: SearchResults) -> str:
         """Format search results with course and lesson context"""
+        import re
+
         formatted = []
         sources = []  # Track sources for the UI
-        
+        seen_links = set()  # Deduplicate by lesson_link
+
+        def get_lesson_sort_key(item):
+            # item can be dict with 'lesson_link' or source dict with 'link'
+            link = item.get('lesson_link', '') or item.get('link', '')
+            title = item.get('title', '') or item.get('course_title', '')
+            # Extract lesson number from title like "Lesson 3"
+            match = re.search(r'Lesson (\d+)', title)
+            if match:
+                return int(match.group(1))
+            # Fallback: put "introduction" first
+            if 'introduction' in title.lower():
+                return -1
+            return 999
+
+        all_items = []
         for doc, meta in zip(results.documents, results.metadata):
             course_title = meta.get('course_title', 'unknown')
             lesson_num = meta.get('lesson_number')
-            
+            lesson_link = meta.get('lesson_link')
+
+            # Skip duplicate lesson links
+            if lesson_link and lesson_link in seen_links:
+                continue
+            if lesson_link:
+                seen_links.add(lesson_link)
+
             # Build context header
             header = f"[{course_title}"
             if lesson_num is not None:
                 header += f" - Lesson {lesson_num}"
             header += "]"
-            
-            # Track source for the UI
-            source = course_title
+
+            # Track source with link for the UI
+            source_title = course_title
             if lesson_num is not None:
-                source += f" - Lesson {lesson_num}"
-            sources.append(source)
-            
-            formatted.append(f"{header}\n{doc}")
-        
-        # Store sources for retrieval
+                source_title += f" - Lesson {lesson_num}"
+            sources.append({"title": source_title, "link": lesson_link})
+
+            result = f"{header}\n{doc}"
+            # Embed lesson link as invisible clickable element (no visible URL text)
+            if lesson_link:
+                result += f'<a href="{lesson_link}" target="_blank" rel="noopener" class="lesson-link"></a>'
+
+            all_items.append({
+                'result': result,
+                'lesson_link': lesson_link,
+                'course_title': course_title,
+                'lesson_number': lesson_num
+            })
+
+        # Sort all_items by lesson number
+        all_items.sort(key=get_lesson_sort_key)
+        formatted = [item['result'] for item in all_items]
+
+        # Store sources for retrieval (sorted by lesson number)
+        sources.sort(key=get_lesson_sort_key)
         self.last_sources = sources
-        
+
         return "\n\n".join(formatted)
 
 class ToolManager:

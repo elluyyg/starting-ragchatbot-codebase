@@ -186,16 +186,17 @@ class VectorStore:
         """Add course content chunks to the vector store"""
         if not chunks:
             return
-        
+
         documents = [chunk.content for chunk in chunks]
         metadatas = [{
             "course_title": chunk.course_title,
             "lesson_number": chunk.lesson_number,
-            "chunk_index": chunk.chunk_index
+            "chunk_index": chunk.chunk_index,
+            "lesson_link": chunk.lesson_link
         } for chunk in chunks]
         # Use title with chunk index for unique IDs
         ids = [f"{chunk.course_title.replace(' ', '_')}_{chunk.chunk_index}" for chunk in chunks]
-        
+
         self.course_content.add(
             documents=documents,
             metadatas=metadatas,

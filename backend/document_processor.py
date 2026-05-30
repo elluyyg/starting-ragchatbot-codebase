@@ -191,7 +191,8 @@ class DocumentProcessor:
                                 content=chunk_with_context,
                                 course_title=course.title,
                                 lesson_number=current_lesson,
-                                chunk_index=chunk_counter
+                                chunk_index=chunk_counter,
+                                lesson_link=lesson_link
                             )
                             course_chunks.append(course_chunk)
                             chunk_counter += 1
@@ -230,14 +231,15 @@ class DocumentProcessor:
                 chunks = self.chunk_text(lesson_text)
                 for idx, chunk in enumerate(chunks):
                     # For any chunk of each lesson, add lesson context & course title
-                  
+
                     chunk_with_context = f"Course {course_title} Lesson {current_lesson} content: {chunk}"
-                    
+
                     course_chunk = CourseChunk(
                         content=chunk_with_context,
                         course_title=course.title,
                         lesson_number=current_lesson,
-                        chunk_index=chunk_counter
+                        chunk_index=chunk_counter,
+                        lesson_link=lesson_link
                     )
                     course_chunks.append(course_chunk)
                     chunk_counter += 1
