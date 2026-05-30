@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Query Flow Sequence Diagram</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00d4ff;
+            font-size: 1.5rem;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .mermaid {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RAG Query Flow Sequence Diagram</h1>
+        <pre class="mermaid">
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant FastAPI
+    participant RAGSystem
+    participant AIGenerator
+    participant ToolManager
+    participant CourseSearchTool
+    participant VectorStore
+    participant ChromaDB
+
+    User->>Frontend: Types query, submits
+    Frontend->>FastAPI: POST /api/query {query, session_id}
+    FastAPI->>RAGSystem: rag_system.query(query, session_id)
+
+    RAGSystem->>AIGenerator: generate_response(query, history, tools, tool_manager)
+
+    AIGenerator->>AIGenerator: Build system prompt + history
+    AIGenerator->>AIGenerator: POST to Claude with tools=[search_course_content]
+
+    alt Claude decides to search
+        AIGenerator->>ToolManager: execute_tool("search_course_content", query, ...)
+        ToolManager->>CourseSearchTool: execute(query, course_name, lesson_number)
+        CourseSearchTool->>VectorStore: search(query, course_name, lesson_number)
+        VectorStore->>ChromaDB: Semantic similarity search
+        ChromaDB-->>VectorStore: Return matching chunks
+        VectorStore-->>CourseSearchTool: Return SearchResults
+        CourseSearchTool-->>ToolManager: Formatted results + sources
+        ToolManager-->>AIGenerator: Return tool result string
+        AIGenerator-->>AIGenerator: Continue with Claude synthesis
+    end
+
+    AIGenerator-->>RAGSystem: Final response text
+    RAGSystem-->>FastAPI: (answer, sources)
+    FastAPI-->>Frontend: {answer, sources, session_id}
+    Frontend->>User: Display answer + sources
+        </pre>
+    </div>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#00d4ff',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#00d4ff',
+                lineColor: '#7f8fa6',
+                secondaryColor: '#16213e',
+                tertiaryColor: '#1a1a2e'
+            }
+        });
+    </script>
+</body>
+</html>

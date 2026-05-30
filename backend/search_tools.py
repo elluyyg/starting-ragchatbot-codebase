@@ -97,14 +97,22 @@ class CourseSearchTool(Tool):
             # item can be dict with 'lesson_link' or source dict with 'link'
             link = item.get('lesson_link', '') or item.get('link', '')
             title = item.get('title', '') or item.get('course_title', '')
-            # Extract lesson number from title like "Lesson 3"
-            match = re.search(r'Lesson (\d+)', title)
-            if match:
-                return int(match.group(1))
-            # Fallback: put "introduction" first
-            if 'introduction' in title.lower():
-                return -1
-            return 999
+            course = item.get('course_title', '')
+            # Use lesson_number directly if available
+            lesson_num = item.get('lesson_number')
+            if lesson_num is None:
+                # Fallback: try to extract from title
+                match = re.search(r'Lesson (\d+)', title)
+                if match:
+                    lesson_num = int(match.group(1))
+                else:
+                    # Fallback: put "introduction" first
+                    if 'introduction' in title.lower():
+                        lesson_num = -1
+                    else:
+                        lesson_num = 999
+            # Sort by course first, then by lesson number
+            return (course, lesson_num)
 
         all_items = []
         for doc, meta in zip(results.documents, results.metadata):
@@ -128,7 +136,7 @@ class CourseSearchTool(Tool):
             source_title = course_title
             if lesson_num is not None:
                 source_title += f" - Lesson {lesson_num}"
-            sources.append({"title": source_title, "link": lesson_link})
+            sources.append({"title": source_title, "link": lesson_link, "course_title": course_title})
 
             result = f"{header}\n{doc}"
             # Embed lesson link as invisible clickable element (no visible URL text)
