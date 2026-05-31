@@ -1,16 +1,16 @@
-from typing import Dict, Any, Optional, Protocol
+from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
 from vector_store import VectorStore, SearchResults
 
 
 class Tool(ABC):
     """Abstract base class for all tools"""
-    
+
     @abstractmethod
     def get_tool_definition(self) -> Dict[str, Any]:
         """Return Anthropic tool definition for this tool"""
         pass
-    
+
     @abstractmethod
     def execute(self, **kwargs) -> str:
         """Execute the tool with given parameters"""
@@ -19,11 +19,11 @@ class Tool(ABC):
 
 class CourseSearchTool(Tool):
     """Tool for searching course content with semantic course name matching"""
-    
+
     def __init__(self, vector_store: VectorStore):
         self.store = vector_store
         self.last_sources = []  # Track sources from last search (list of dicts with title/link)
-    
+
     def get_tool_definition(self) -> Dict[str, Any]:
         """Return Anthropic tool definition for this tool"""
         return {
@@ -33,46 +33,46 @@ class CourseSearchTool(Tool):
                 "type": "object",
                 "properties": {
                     "query": {
-                        "type": "string", 
-                        "description": "What to search for in the course content"
+                        "type": "string",
+                        "description": "What to search for in the course content",
                     },
                     "course_name": {
                         "type": "string",
-                        "description": "Course title (partial matches work, e.g. 'MCP', 'Introduction')"
+                        "description": "Course title (partial matches work, e.g. 'MCP', 'Introduction')",
                     },
                     "lesson_number": {
                         "type": "integer",
-                        "description": "Specific lesson number to search within (e.g. 1, 2, 3)"
-                    }
+                        "description": "Specific lesson number to search within (e.g. 1, 2, 3)",
+                    },
                 },
-                "required": ["query"]
-            }
+                "required": ["query"],
+            },
         }
-    
-    def execute(self, query: str, course_name: Optional[str] = None, lesson_number: Optional[int] = None) -> str:
+
+    def execute(
+        self, query: str, course_name: Optional[str] = None, lesson_number: Optional[int] = None
+    ) -> str:
         """
         Execute the search tool with given parameters.
-        
+
         Args:
             query: What to search for
             course_name: Optional course filter
             lesson_number: Optional lesson filter
-            
+
         Returns:
             Formatted search results or error message
         """
-        
+
         # Use the vector store's unified search interface
         results = self.store.search(
-            query=query,
-            course_name=course_name,
-            lesson_number=lesson_number
+            query=query, course_name=course_name, lesson_number=lesson_number
         )
-        
+
         # Handle errors
         if results.error:
             return results.error
-        
+
         # Handle empty results
         if results.is_empty():
             filter_info = ""
@@ -81,10 +81,10 @@ class CourseSearchTool(Tool):
             if lesson_number:
                 filter_info += f" in lesson {lesson_number}"
             return f"No relevant content found{filter_info}."
-        
+
         # Format and return results
         return self._format_results(results)
-    
+
     def _format_results(self, results: SearchResults) -> str:
         """Format search results with course and lesson context"""
         import re
@@ -95,19 +95,19 @@ class CourseSearchTool(Tool):
 
         def get_lesson_sort_key(item):
             # item can be dict with 'lesson_link' or source dict with 'link'
-            link = item.get('lesson_link', '') or item.get('link', '')
-            title = item.get('title', '') or item.get('course_title', '')
-            course = item.get('course_title', '')
+            link = item.get("lesson_link", "") or item.get("link", "")
+            title = item.get("title", "") or item.get("course_title", "")
+            course = item.get("course_title", "")
             # Use lesson_number directly if available
-            lesson_num = item.get('lesson_number')
+            lesson_num = item.get("lesson_number")
             if lesson_num is None:
                 # Fallback: try to extract from title
-                match = re.search(r'Lesson (\d+)', title)
+                match = re.search(r"Lesson (\d+)", title)
                 if match:
                     lesson_num = int(match.group(1))
                 else:
                     # Fallback: put "introduction" first
-                    if 'introduction' in title.lower():
+                    if "introduction" in title.lower():
                         lesson_num = -1
                     else:
                         lesson_num = 999
@@ -116,9 +116,9 @@ class CourseSearchTool(Tool):
 
         all_items = []
         for doc, meta in zip(results.documents, results.metadata):
-            course_title = meta.get('course_title', 'unknown')
-            lesson_num = meta.get('lesson_number')
-            lesson_link = meta.get('lesson_link')
+            course_title = meta.get("course_title", "unknown")
+            lesson_num = meta.get("lesson_number")
+            lesson_link = meta.get("lesson_link")
 
             # Skip duplicate lesson links
             if lesson_link and lesson_link in seen_links:
@@ -136,23 +136,27 @@ class CourseSearchTool(Tool):
             source_title = course_title
             if lesson_num is not None:
                 source_title += f" - Lesson {lesson_num}"
-            sources.append({"title": source_title, "link": lesson_link, "course_title": course_title})
+            sources.append(
+                {"title": source_title, "link": lesson_link, "course_title": course_title}
+            )
 
             result = f"{header}\n{doc}"
             # Embed lesson link as invisible clickable element (no visible URL text)
             if lesson_link:
                 result += f'<a href="{lesson_link}" target="_blank" rel="noopener" class="lesson-link"></a>'
 
-            all_items.append({
-                'result': result,
-                'lesson_link': lesson_link,
-                'course_title': course_title,
-                'lesson_number': lesson_num
-            })
+            all_items.append(
+                {
+                    "result": result,
+                    "lesson_link": lesson_link,
+                    "course_title": course_title,
+                    "lesson_number": lesson_num,
+                }
+            )
 
         # Sort all_items by lesson number
         all_items.sort(key=get_lesson_sort_key)
-        formatted = [item['result'] for item in all_items]
+        formatted = [item["result"] for item in all_items]
 
         # Store sources for retrieval (sorted by lesson number)
         sources.sort(key=get_lesson_sort_key)
@@ -176,11 +180,11 @@ class CourseOutlineTool(Tool):
                 "properties": {
                     "course_name": {
                         "type": "string",
-                        "description": "Course title (partial matches work, e.g. 'MCP', 'Introduction')"
+                        "description": "Course title (partial matches work, e.g. 'MCP', 'Introduction')",
                     }
                 },
-                "required": ["course_name"]
-            }
+                "required": ["course_name"],
+            },
         }
 
     def execute(self, course_name: str) -> str:
@@ -193,17 +197,17 @@ class CourseOutlineTool(Tool):
         result += f"Instructor: {outline['instructor']}\n"
         result += f"Total Lessons: {outline['lesson_count']}\n\n"
         result += "Lessons:\n"
-        for lesson in outline['lessons']:
+        for lesson in outline["lessons"]:
             result += f"- Lesson {lesson['lesson_number']}: {lesson['lesson_title']}\n"
         return result
 
 
 class ToolManager:
     """Manages available tools for the AI"""
-    
+
     def __init__(self):
         self.tools = {}
-    
+
     def register_tool(self, tool: Tool):
         """Register any tool that implements the Tool interface"""
         tool_def = tool.get_tool_definition()
@@ -212,28 +216,27 @@ class ToolManager:
             raise ValueError("Tool must have a 'name' in its definition")
         self.tools[tool_name] = tool
 
-    
     def get_tool_definitions(self) -> list:
         """Get all tool definitions for Anthropic tool calling"""
         return [tool.get_tool_definition() for tool in self.tools.values()]
-    
+
     def execute_tool(self, tool_name: str, **kwargs) -> str:
         """Execute a tool by name with given parameters"""
         if tool_name not in self.tools:
             return f"Tool '{tool_name}' not found"
-        
+
         return self.tools[tool_name].execute(**kwargs)
-    
+
     def get_last_sources(self) -> list:
         """Get sources from the last search operation"""
         # Check all tools for last_sources attribute
         for tool in self.tools.values():
-            if hasattr(tool, 'last_sources') and tool.last_sources:
+            if hasattr(tool, "last_sources") and tool.last_sources:
                 return tool.last_sources
         return []
 
     def reset_sources(self):
         """Reset sources from all tools that track sources"""
         for tool in self.tools.values():
-            if hasattr(tool, 'last_sources'):
+            if hasattr(tool, "last_sources"):
                 tool.last_sources = []

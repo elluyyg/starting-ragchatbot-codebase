@@ -1,5 +1,6 @@
 import requests
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
+
 
 class AIGenerator:
     """Handles interactions with DeepSeek API for generating responses"""
@@ -37,14 +38,17 @@ Response Protocol:
     def __init__(self, api_key: str, model: str, base_url: str = ""):
         self.api_key = api_key
         self.model = model
-        self.base_url = base_url.rstrip('/') if base_url else "https://api.deepseek.com/anthropic"
+        self.base_url = base_url.rstrip("/") if base_url else "https://api.deepseek.com/anthropic"
         self.api_url = f"{self.base_url}/v1/messages"
         self.max_tokens = 800
 
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: Optional[str] = None,
+        tools: Optional[List] = None,
+        tool_manager=None,
+    ) -> str:
         """
         Generate AI response with optional tool usage and conversation context.
         """
@@ -55,16 +59,13 @@ Response Protocol:
             else self.SYSTEM_PROMPT
         )
 
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
 
         api_payload = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "messages": [{"role": "user", "content": query}],
-            "system": system_content
+            "system": system_content,
         }
 
         if tools:
@@ -88,7 +89,9 @@ Response Protocol:
                 return block["text"]
         return ""
 
-    def _handle_tool_execution(self, initial_response: Dict, base_params: Dict, tool_manager, max_rounds: int = 2):
+    def _handle_tool_execution(
+        self, initial_response: Dict, base_params: Dict, tool_manager, max_rounds: int = 2
+    ):
         """Handle execution of tool calls and get follow-up response. Supports up to max_rounds sequential tool calls."""
         messages = base_params["messages"].copy()
         rounds = 0
@@ -101,12 +104,24 @@ Response Protocol:
 
             if self._is_dsml_echo(content):
                 dsml_result = self._extract_and_execute_dsml(content, tool_manager)
-                assistant_content = thinking_blocks + tool_blocks if thinking_blocks else current_response["content"]
+                assistant_content = (
+                    thinking_blocks + tool_blocks
+                    if thinking_blocks
+                    else current_response["content"]
+                )
                 messages.append({"role": "assistant", "content": assistant_content})
-                messages.append({
-                    "role": "user",
-                    "content": [{"type": "tool_result", "tool_use_id": tool_blocks[0]["id"] if tool_blocks else "dsml_echo", "content": dsml_result}]
-                })
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": tool_blocks[0]["id"] if tool_blocks else "dsml_echo",
+                                "content": dsml_result,
+                            }
+                        ],
+                    }
+                )
             elif tool_blocks:
                 messages.append({"role": "assistant", "content": current_response["content"]})
 
@@ -116,11 +131,9 @@ Response Protocol:
                         tool_result = tool_manager.execute_tool(block["name"], **block["input"])
                     except Exception as e:
                         tool_result = f"Error executing tool: {str(e)}"
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block["id"],
-                        "content": tool_result
-                    })
+                    tool_results.append(
+                        {"type": "tool_result", "tool_use_id": block["id"], "content": tool_result}
+                    )
 
                 if tool_results:
                     messages.append({"role": "user", "content": tool_results})
@@ -135,15 +148,17 @@ Response Protocol:
                 "messages": messages,
                 "system": base_params["system"],
                 "tools": base_params.get("tools"),
-                "tool_choice": {"type": "auto"}
+                "tool_choice": {"type": "auto"},
             }
 
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
 
-            next_response = requests.post(self.api_url, headers=headers, json=next_params, timeout=60)
+            next_response = requests.post(
+                self.api_url, headers=headers, json=next_params, timeout=60
+            )
 
             if next_response.status_code != 200:
                 raise Exception(f"API error {next_response.status_code}: {next_response.text}")
@@ -189,6 +204,7 @@ Response Protocol:
 
                 # Extract tool name - look for invoke name="..."
                 import re
+
                 name_match = re.search(r'invoke name="([^"]+)"', text)
                 if not name_match:
                     return "Error: Could not extract tool name from DSML echo"

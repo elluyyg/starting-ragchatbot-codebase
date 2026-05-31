@@ -80,6 +80,18 @@ Set `ANTHROPIC_API_KEY` in `.env`. Other settings in `backend/config.py`:
 
 No test suite exists in this project.
 
+## Code Quality
+
+```bash
+# Format code
+./format.sh
+
+# Run quality checks
+./check.sh
+```
+
+Tools: **black** (formatting, 100 char line length) and **ruff** (linting).
+
 ## API Endpoints
 
 - `POST /api/query` — Process a query; returns `{answer, sources, session_id}`
