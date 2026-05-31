@@ -482,6 +482,98 @@ header h1 {
     margin: 0.5rem 0;
 }
 
+/* Light theme variables (activated via .light-theme on body) */
+body.light-theme {
+    --primary-color: #2563eb;
+    --primary-hover: #1d4ed8;
+    --background: #f8fafc;
+    --surface: #ffffff;
+    --surface-hover: #f1f5f9;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --border-color: #cbd5e1;
+    --user-message: #2563eb;
+    --assistant-message: #e2e8f0;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --radius: 12px;
+    --focus-ring: rgba(37, 99, 235, 0.4);
+    --welcome-bg: #dbeafe;
+    --welcome-border: #2563eb;
+}
+
+/* Light theme code background fix */
+body.light-theme .message-content code,
+body.light-theme .message-content pre {
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .message-content pre code {
+    background-color: transparent;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow);
+}
+
+.theme-toggle:hover {
+    background: var(--surface-hover);
+    transform: scale(1.05);
+}
+
+.theme-toggle:active {
+    transform: scale(0.95);
+}
+
+.theme-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.theme-toggle svg {
+    width: 22px;
+    height: 22px;
+    color: var(--text-primary);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Sun and moon icons */
+.theme-toggle .sun-icon {
+    position: absolute;
+    opacity: 1;
+    transform: rotate(0deg);
+}
+
+.theme-toggle .moon-icon {
+    position: absolute;
+    opacity: 0;
+    transform: rotate(-90deg);
+}
+
+body.light-theme .theme-toggle .sun-icon {
+    opacity: 0;
+    transform: rotate(90deg);
+}
+
+body.light-theme .theme-toggle .moon-icon {
+    opacity: 1;
+    transform: rotate(0deg);
+}
+
 /* Sidebar Headers */
 .stats-header,
 .suggested-header {
