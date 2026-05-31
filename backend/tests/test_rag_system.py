@@ -1,14 +1,14 @@
 """Integration tests for the RAG system to verify lesson-specific queries work correctly"""
 
 import pytest
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, patch
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from rag_system import RAGSystem
-from search_tools import SearchResults, CourseSearchTool, CourseOutlineTool
+from search_tools import CourseSearchTool
 from config import Config
 
 
@@ -40,13 +40,15 @@ class TestRAGSystemLessonQueries:
     @pytest.fixture
     def rag_system_with_mocks(self, mock_config, mock_vector_store):
         """Create RAGSystem with mocked dependencies"""
-        with patch('rag_system.DocumentProcessor'), \
-             patch('rag_system.VectorStore', return_value=mock_vector_store), \
-             patch('rag_system.AIGenerator') as mock_ai, \
-             patch('rag_system.SessionManager'), \
-             patch('rag_system.ToolManager') as mock_tm, \
-             patch('rag_system.CourseSearchTool') as mock_search, \
-             patch('rag_system.CourseOutlineTool'):
+        with (
+            patch("rag_system.DocumentProcessor"),
+            patch("rag_system.VectorStore", return_value=mock_vector_store),
+            patch("rag_system.AIGenerator") as mock_ai,
+            patch("rag_system.SessionManager"),
+            patch("rag_system.ToolManager") as mock_tm,
+            patch("rag_system.CourseSearchTool") as mock_search,
+            patch("rag_system.CourseOutlineTool"),
+        ):
 
             # Set up the mock tool manager
             instance_tm = MagicMock()
@@ -68,9 +70,7 @@ class TestRAGSystemLessonQueries:
 
             yield rag
 
-    def test_query_about_lesson_5_invokes_search_with_lesson_number(
-        self, rag_system_with_mocks
-    ):
+    def test_query_about_lesson_5_invokes_search_with_lesson_number(self, rag_system_with_mocks):
         """Test that asking 'what was covered in lesson 5' triggers search with lesson_number=5"""
         rag = rag_system_with_mocks
         tool_definitions = [{"name": "search_course_content", "input_schema": {"type": "object"}}]
@@ -79,8 +79,8 @@ class TestRAGSystemLessonQueries:
         captured_params = {}
 
         def mock_generate_response(query, conversation_history, tools, tool_manager):
-            captured_params['query'] = query
-            captured_params['tools'] = tools
+            captured_params["query"] = query
+            captured_params["tools"] = tools
 
             # Simulate AI returning content without tool use for this test
             # In real flow, AI would call tool with lesson_number=5
@@ -99,9 +99,7 @@ class TestRAGSystemLessonQueries:
         # The AI needs to understand this is about lesson 5
         assert "lesson 5" in query.lower() or "Lesson 5" in query
 
-    def test_query_without_lesson_specification_returns_all_content(
-        self, rag_system_with_mocks
-    ):
+    def test_query_without_lesson_specification_returns_all_content(self, rag_system_with_mocks):
         """Test that general queries don't filter by lesson number"""
         rag = rag_system_with_mocks
 
@@ -134,15 +132,14 @@ class TestRAGSystemToolIntegration:
 
     def test_rag_system_handles_lesson_specific_source_links(self):
         """Test that lesson-specific queries return sources with correct lesson links"""
-        mock_sources = [
-            {"title": "MCP Course - Lesson 5", "link": "https://example.com/lesson5"}
-        ]
+        mock_sources = [{"title": "MCP Course - Lesson 5", "link": "https://example.com/lesson5"}]
 
         # Verify sources from lesson-specific search contain lesson 5 link
-        assert any("lesson5" in str(s.get('link', '')).lower() or
-                   "lesson_5" in str(s.get('link', '')).lower()
-                   for s in mock_sources), \
-            f"Expected lesson 5 link in sources, got: {mock_sources}"
+        assert any(
+            "lesson5" in str(s.get("link", "")).lower()
+            or "lesson_5" in str(s.get("link", "")).lower()
+            for s in mock_sources
+        ), f"Expected lesson 5 link in sources, got: {mock_sources}"
 
 
 class TestRAGSystemEndToEnd:
@@ -183,7 +180,7 @@ class TestVectorStoreLessonFiltering:
         expected_filter = {
             "$and": [
                 {"course_title": "MCP: Build Rich-Context AI Apps with Anthropic"},
-                {"lesson_number": 5}
+                {"lesson_number": 5},
             ]
         }
 
