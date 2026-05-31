@@ -26,6 +26,7 @@ uploads/
 *.swp
 *.swo
 .playwright-mcp/
+.claude/
 
 # OS
 .DS_Store

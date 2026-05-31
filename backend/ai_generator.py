@@ -13,7 +13,7 @@ Available Tools:
 Tool Usage:
 - Use **get_course_outline** for questions about course outline, all lessons, or course structure
 - Use **search_course_content** for specific content or detailed material questions
-- **One tool call per query maximum**
+- **Up to 2 sequential tool calls per query** — when a tool result reveals new information, you may call another tool to follow up
 - Synthesize search results into accurate, fact-based responses
 - If search yields no results, state this clearly without offering alternatives
 
@@ -88,64 +88,78 @@ Response Protocol:
                 return block["text"]
         return ""
 
-    def _handle_tool_execution(self, initial_response: Dict, base_params: Dict, tool_manager):
-        """Handle execution of tool calls and get follow-up response."""
+    def _handle_tool_execution(self, initial_response: Dict, base_params: Dict, tool_manager, max_rounds: int = 2):
+        """Handle execution of tool calls and get follow-up response. Supports up to max_rounds sequential tool calls."""
         messages = base_params["messages"].copy()
+        rounds = 0
+        current_response = initial_response
 
-        content = initial_response.get("content", [])
-        thinking_blocks = [b for b in content if b.get("type") == "thinking"]
-        tool_blocks = [b for b in content if b.get("type") == "tool_use"]
+        while rounds < max_rounds:
+            content = current_response.get("content", [])
+            thinking_blocks = [b for b in content if b.get("type") == "thinking"]
+            tool_blocks = [b for b in content if b.get("type") == "tool_use"]
 
-        if self._is_dsml_echo(content):
-            dsml_result = self._extract_and_execute_dsml(content, tool_manager)
-            # Pass back thinking blocks if present, then tool result
-            assistant_content = thinking_blocks + tool_blocks if thinking_blocks else initial_response["content"]
-            messages.append({"role": "assistant", "content": assistant_content})
-            messages.append({
-                "role": "user",
-                "content": [{"type": "tool_result", "tool_use_id": tool_blocks[0]["id"] if tool_blocks else "dsml_echo", "content": dsml_result}]
-            })
-        else:
-            messages.append({"role": "assistant", "content": initial_response["content"]})
-
-            tool_results = []
-            for block in tool_blocks:
-                tool_result = tool_manager.execute_tool(
-                    block["name"],
-                    **block["input"]
-                )
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block["id"],
-                    "content": tool_result
+            if self._is_dsml_echo(content):
+                dsml_result = self._extract_and_execute_dsml(content, tool_manager)
+                assistant_content = thinking_blocks + tool_blocks if thinking_blocks else current_response["content"]
+                messages.append({"role": "assistant", "content": assistant_content})
+                messages.append({
+                    "role": "user",
+                    "content": [{"type": "tool_result", "tool_use_id": tool_blocks[0]["id"] if tool_blocks else "dsml_echo", "content": dsml_result}]
                 })
+            elif tool_blocks:
+                messages.append({"role": "assistant", "content": current_response["content"]})
 
-            if tool_results:
-                messages.append({"role": "user", "content": tool_results})
+                tool_results = []
+                for block in tool_blocks:
+                    try:
+                        tool_result = tool_manager.execute_tool(block["name"], **block["input"])
+                    except Exception as e:
+                        tool_result = f"Error executing tool: {str(e)}"
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block["id"],
+                        "content": tool_result
+                    })
 
-        final_params = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "messages": messages,
-            "system": base_params["system"]
-        }
+                if tool_results:
+                    messages.append({"role": "user", "content": tool_results})
+            else:
+                # No tool blocks - this is the final response
+                break
 
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+            # Make next API call WITH tools still enabled (for potential second round)
+            next_params = {
+                "model": self.model,
+                "max_tokens": self.max_tokens,
+                "messages": messages,
+                "system": base_params["system"],
+                "tools": base_params.get("tools"),
+                "tool_choice": {"type": "auto"}
+            }
 
-        final_response = requests.post(self.api_url, headers=headers, json=final_params, timeout=60)
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
 
-        if final_response.status_code != 200:
-            raise Exception(f"API error {final_response.status_code}: {final_response.text}")
+            next_response = requests.post(self.api_url, headers=headers, json=next_params, timeout=60)
 
-        resp_data = final_response.json()
-        content = resp_data.get("content", [])
+            if next_response.status_code != 200:
+                raise Exception(f"API error {next_response.status_code}: {next_response.text}")
 
-        # Check if we got DSML text blocks (DeepSeek embeds tool calls in text instead of proper format)
+            current_response = next_response.json()
+
+            # Check if LLM wants to use more tools or return text
+            if current_response.get("stop_reason") != "tool_use":
+                break
+
+            rounds += 1
+
+        # Final response processing
+        content = current_response.get("content", [])
+
         if self._is_dsml_echo(content):
-            # Extract and execute the DSML tool call, return the search result directly
             dsml_result = self._extract_and_execute_dsml(content, tool_manager)
             return dsml_result
 
