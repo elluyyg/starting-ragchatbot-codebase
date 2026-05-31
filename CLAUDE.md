@@ -68,10 +68,29 @@ Documents are chunked by sentences with configurable `CHUNK_SIZE` (800 chars) an
 
 Set `ANTHROPIC_API_KEY` in `.env`. Other settings in `backend/config.py`:
 - `ANTHROPIC_MODEL` — Claude model (default: claude-sonnet-4-20250514)
-- `EMBEDDING_MODEL` — Sentence transformer (default: all-MiniLM-L6-v2)
+- `ANTHROPIC_BASE_URL` — Override for DeepSeek or other Anthropic-compatible APIs
+- `OLLAMA_EMBEDDING_URL` — Ollama server URL (default: http://localhost:11434)
+- `OLLAMA_EMBEDDING_MODEL` — Ollama embedding model (default: nomic-embed-text)
 - `CHROMA_PATH` — ChromaDB storage location (default: ./chroma_db)
 - `MAX_RESULTS` — Search results limit (default: 5)
 - `MAX_HISTORY` — Conversation message pairs to retain (default: 2)
+- `CHUNK_SIZE` / `CHUNK_OVERLAP` — Document chunking (default: 800/100 chars)
+
+## Testing
+
+No test suite exists in this project.
+
+## Code Quality
+
+```bash
+# Format code
+./format.sh
+
+# Run quality checks
+./check.sh
+```
+
+Tools: **black** (formatting, 100 char line length) and **ruff** (linting).
 
 ## API Endpoints
 

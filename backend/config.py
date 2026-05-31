@@ -3,11 +3,13 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'), override=True)
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
+
 
 @dataclass
 class Config:
     """Configuration settings for the RAG system"""
+
     # Anthropic API settings (DeepSeek compatible via ANTHROPIC_BASE_URL)
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "") or ""
     ANTHROPIC_MODEL: str = os.getenv("ANTHROPIC_MODEL", "") or "claude-sonnet-4-20250514"
@@ -26,6 +28,5 @@ class Config:
     # Database paths
     CHROMA_PATH: str = "./chroma_db"
 
+
 config = Config()
-
-

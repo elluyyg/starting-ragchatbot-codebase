@@ -25,6 +25,8 @@ uploads/
 .idea/
 *.swp
 *.swo
+.playwright-mcp/
+.claude/
 
 # OS
 .DS_Store
